@@ -1,17 +1,15 @@
 package memlib
 
-import "core:simd"
-
 CHUNK_SIZE :: 16
 MAX_PATTERN_SIZE :: 128
 CHUNK_COUNT :: MAX_PATTERN_SIZE / CHUNK_SIZE
 
 Pattern :: struct #align (64) {
-	data:          [MAX_PATTERN_SIZE]u8,
-	mask:          [CHUNK_COUNT]u16,
-	required_vecs: [CHUNK_COUNT]simd.u8x16,
-	size:          int,
-	padded_size:   int,
+	data:        [MAX_PATTERN_SIZE]u8,
+	mask:        [CHUNK_COUNT]u16,
+	required:    [MAX_PATTERN_SIZE]u8,
+	size:        int,
+	padded_size: int,
 }
 
 @(private = "file")
@@ -94,14 +92,14 @@ compile_pattern :: proc(ptext: string) -> (pat: Pattern, ok: bool) {
 		wild_bits |= 1 << uint(k)
 	}
 
-	for chunk in 0 ..< CHUNK_COUNT {
+	num_padded_chunks := padded_size / CHUNK_SIZE
+	for chunk in 0 ..< num_padded_chunks {
 		pat.mask[chunk] = u16(wild_bits >> uint(chunk * CHUNK_SIZE))
 		m := pat.mask[chunk]
-		req_bytes: [CHUNK_SIZE]u8
+		base := chunk * CHUNK_SIZE
 		for lane in 0 ..< CHUNK_SIZE {
-			req_bytes[lane] = ((m >> uint(lane)) & 1) == 1 ? 0x00 : 0xFF
+			pat.required[base + lane] = ((m >> uint(lane)) & 1) == 1 ? 0x00 : 0xFF
 		}
-		pat.required_vecs[chunk] = simd.from_array(req_bytes)
 	}
 
 	pat.size = raw_size
@@ -196,21 +194,5 @@ parse_brace_repeat :: proc(
 @(require_results)
 find_pattern :: proc(pat: ^Pattern, text: []u8) -> int {
 	if pat.size == 0 || pat.size > len(text) do return -1
-	return _find_pattern_impl(pat, text)
-}
-
-@(private = "package")
-find_pattern_simple :: proc(pat: ^Pattern, text: []u8) -> int #no_bounds_check {
-	end := len(text) - pat.size
-	outer: for i in 0 ..= end {
-		for j in 0 ..< pat.size {
-			chunk := j >> 4
-			bit := u16(1) << uint(j & (CHUNK_SIZE - 1))
-			if (pat.mask[chunk] & bit) == 0 && text[i + j] != pat.data[j] {
-				continue outer
-			}
-		}
-		return i
-	}
-	return -1
+	return find_pattern_simd(pat, text) if len(text) >= 64 else find_pattern_simple(pat, text)
 }
