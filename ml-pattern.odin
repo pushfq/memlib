@@ -17,7 +17,7 @@ HEX_LO :: u64(0x03FF_0000_0000_0000)
 @(private = "file")
 HEX_HI :: u64(0x0000_007E_0000_007E)
 
-@(private = "file")
+@(private = "package")
 is_hex :: #force_inline proc "contextless" (c: u8) -> bool {
 	if c >= 128 {
 		return false
@@ -26,7 +26,7 @@ is_hex :: #force_inline proc "contextless" (c: u8) -> bool {
 	return (m >> (c & 63)) & 1 != 0
 }
 
-@(private = "file")
+@(private = "package")
 to_hex :: #force_inline proc "contextless" (c: u8) -> u8 {
 	return (c & 0xF) + (c >> 6) * 9
 }
