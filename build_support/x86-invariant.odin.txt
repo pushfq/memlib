@@ -1,0 +1,106 @@
+Decode_Desc :: distinct u8
+
+DESC_INVALID    :: Decode_Desc(0x80)
+DESC_HAS_MODRM  :: Decode_Desc(0x40)
+DESC_IS_PREFIX  :: Decode_Desc(0x20)
+DESC_ESCAPE_0F  :: Decode_Desc(0x08)
+DESC_ESCAPE_38  :: Decode_Desc(0x10)
+DESC_ESCAPE_3A  :: Decode_Desc(0x18)
+DESC_ESCAPE_MASK :: Decode_Desc(0x18)
+DESC_IMM_MASK   :: Decode_Desc(0x07)
+
+IMM_NONE   :: Decode_Desc(0)
+IMM_IB     :: Decode_Desc(1)
+IMM_IW     :: Decode_Desc(2)
+IMM_IV     :: Decode_Desc(3)
+IMM_IZ     :: Decode_Desc(4)
+IMM_MOFFS  :: Decode_Desc(5)
+IMM_IB_IB  :: Decode_Desc(6)
+IMM_IW_IB  :: Decode_Desc(7)
+
+PREFIX_NP :: 0
+PREFIX_F3 :: 1
+PREFIX_F2 :: 2
+PREFIX_66 :: 3
+
+PREFIX_NOT_PREFIX :: u8(0xF0)
+PREFIX_IS_66      :: u8(0x30)
+PREFIX_IS_F2      :: u8(0x20)
+PREFIX_IS_F3      :: u8(0x10)
+PREFIX_IS_LEGACY  :: u8(0x00)
+
+ISA_Ext :: enum u8 {
+	NONE = 0,
+	I386,
+	I486,
+	I586,
+	I686,
+	MMX,
+	SSE1,
+	SSE2,
+	SSE3,
+	SSSE3,
+	SSE41,
+	SSE42,
+	LZCNT,
+	BMI1,
+	VMX,
+	SMX,
+}
+
+ISA_Set :: bit_set[ISA_Ext; u32]
+
+ISA_ALL :: ISA_Set{.NONE, .I386, .I486, .I586, .I686, .MMX, .SSE1, .SSE2, .SSE3, .SSSE3, .SSE41, .SSE42, .LZCNT, .BMI1, .VMX, .SMX}
+ISA_8086 :: ISA_Set{.NONE}
+ISA_386 :: ISA_Set{.NONE, .I386}
+ISA_486 :: ISA_Set{.NONE, .I386, .I486}
+ISA_PENTIUM :: ISA_Set{.NONE, .I386, .I486, .I586}
+ISA_PENTIUM_PRO :: ISA_Set{.NONE, .I386, .I486, .I586, .I686}
+ISA_PENTIUM_MMX :: ISA_PENTIUM + {.MMX}
+ISA_SSE :: ISA_PENTIUM_PRO + {.MMX, .SSE1}
+ISA_SSE2 :: ISA_SSE + {.SSE2}
+ISA_SSE3 :: ISA_SSE2 + {.SSE3}
+ISA_SSE4 :: ISA_SSE3 + {.SSSE3, .SSE41, .SSE42}
+
+Group_Desc :: struct #packed {
+	desc:       Decode_Desc,
+	mnemonic:   Mnemonic,
+	isa:        ISA_Ext,
+	variant_id: u8,
+}
+
+Opcode_Full :: struct #packed {
+	desc:         Decode_Desc,
+	mnemonic:     Mnemonic,
+	isa:          ISA_Ext,
+	group_id:     u8,
+	secondary_id: u8,
+	_pad:         [3]u8,
+}
+
+@(rodata)
+imm_size_base := [8]u8{
+	0, 1, 2, 4, 4, 4, 2, 3,
+}
+
+Handler_Type :: enum u8 {
+	Simple = 0,
+	Opsize_16_32_64,
+	Mode32_64,
+	RexW,
+	Mod_Mem_Reg,
+	Fwait,
+}
+
+Mnemonic_Variant :: struct {
+	opcode_map:   u8,
+	prefix_state: u8,
+	opcode:       u8,
+	handler_type: Handler_Type,
+	variants:     [3]Mnemonic,
+}
+
+Group_Variant :: struct {
+	handler_type: Handler_Type,
+	variants:     [2]Mnemonic,
+}
